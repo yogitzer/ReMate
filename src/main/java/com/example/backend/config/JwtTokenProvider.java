@@ -25,4 +25,18 @@ public class JwtTokenProvider {
         .signWith(key) // 우리만 아는 비밀키로 서명
         .compact();
   }
+  // JwtTokenProvider 안에 추가해 주세요
+  public boolean validateToken(String token) {
+    try {
+      Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public String getSubject(String token) {
+    return Jwts.parserBuilder().setSigningKey(key).build()
+            .parseClaimsJws(token).getBody().getSubject();
+  }
 }
