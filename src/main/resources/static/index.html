@@ -2,56 +2,62 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receipt Master | 메인</title>
     <style>
         :root { --kakao-color: #FEE500; --google-color: #4285F4; }
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-        .btn { display: block; padding: 12px; margin: 10px 0; border-radius: 8px; text-decoration: none; font-weight: bold; transition: 0.3s; }
+        .btn { display: block; padding: 12px; margin: 10px 0; border-radius: 8px; text-decoration: none; font-weight: bold; transition: 0.3s; border: none; font-size: 0.95rem; }
         .btn-google { background: var(--google-color); color: white; }
         .btn-kakao { background: var(--kakao-color); color: #3c1e1e; }
-        .btn-upload { background: #333; color: white; border: none; cursor: pointer; width: 100%; }
+        .btn-signup { background: #4CAF50; color: white; } /* 일반 회원가입 버튼 */
         .hidden { display: none; }
-        #token-box { background: #eee; padding: 10px; font-size: 0.7rem; word-break: break-all; border-radius: 5px; margin-top: 15px; color: #666; }
+        #loading-section { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>🧾 Receipt Master</h1>
 
-    <div id="before-login">
-        <p>소셜 계정으로 간편하게 시작하세요</p>
-        <a href="/oauth2/authorization/google" class="btn btn-google">Google 로그인</a>
-        <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao 로그인</a>
+    <div id="intro-section">
+        <p><strong>영수증 관리의 시작</strong></p>
+        <p style="font-size: 0.85rem; color: #888; margin-bottom: 25px;">간편한 소셜 로그인 또는 일반 회원가입을 선택하세요.</p>
+
+        <a href="/oauth2/authorization/google" class="btn btn-google">Google로 시작하기</a>
+
+        <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao로 시작하기</a>
+
+        <div style="margin: 20px 0; color: #ddd; font-size: 0.8rem;">OR</div>
+
+        <a href="/signup.html" class="btn btn-signup">이메일로 회원가입</a>
+
+        <p style="margin-top: 15px; font-size: 0.8rem;">
+            이미 계정이 있나요? <a href="/signin.html" style="color: #666;">로그인</a>
+        </p>
     </div>
 
-    <div id="after-login" class="hidden">
-        <p>🎉 <strong>기원님</strong>, 로그인을 환영합니다!</p>
-        <button onclick="location.href='/upload.html'" class="btn btn-upload">📸 영수증 업로드하러 가기</button>
-        <div id="token-box"></div>
-        <a href="/" onclick="localStorage.clear()" style="display:block; margin-top:15px; color:#999; font-size:0.8rem;">로그아웃</a>
+    <div id="loading-section" class="hidden">
+        <p>🔍 워크스페이스 확인 중...</p>
     </div>
 </div>
 
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    window.onload = () => {
+        const token = localStorage.getItem('accessToken');
 
-    if (token) {
-        localStorage.setItem('accessToken', token);
-        document.getElementById('before-login').classList.add('hidden');
-        document.getElementById('after-login').classList.remove('hidden');
-        document.getElementById('token-box').innerText = "내 토큰: " + token;
+        // 이미 로그인 된 상태라면 워크스페이스 체크 로직 가동
+        if (token) {
+            document.getElementById('intro-section').classList.add('hidden');
+            document.getElementById('loading-section').classList.remove('hidden');
 
-        // 주소창에서 ?token=... 부분을 싹 지워서 깔끔하게 만듦
-        window.history.replaceState({}, document.title, "/");
-    } else if (localStorage.getItem('accessToken')) {
-        // 이미 로그인 정보가 로컬스토리지에 있는 경우
-        document.getElementById('before-login').classList.add('hidden');
-        document.getElementById('after-login').classList.remove('hidden');
-        document.getElementById('token-box').innerText = "기존 토큰 유지 중";
-    }
+            // 1.5초 후 워크스페이스 유무에 따라 리다이렉트 (시뮬레이션)
+            setTimeout(() => {
+                const workspaceCount = 0; // 0이면 join으로, 1이상이면 진입
+                if (workspaceCount === 0) location.href = "/workspaces/join";
+                else location.href = "/workspaces/main";
+            }, 1500);
+        }
+    };
 </script>
 </body>
 </html>

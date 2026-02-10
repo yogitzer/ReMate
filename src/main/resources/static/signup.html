@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt Master | 회원가입</title>
+    <style>
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-submit { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-submit:disabled { background: #ccc; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>일반 회원가입</h2>
+    <input type="email" id="email" placeholder="이메일">
+    <input type="text" id="name" placeholder="표시명 (닉네임)">
+    <input type="password" id="password" placeholder="비밀번호">
+    <input type="password" id="confirm" placeholder="비밀번호 확인">
+    <button onclick="doSignup()" id="signup-btn" class="btn-submit">가입하기</button>
+    <p style="text-align: center; margin-top: 15px;"><a href="/" style="font-size: 0.8rem; color: #999;">취소하고 돌아가기</a></p>
+</div>
+
+<script>
+    async function doSignup() {
+        // ... (아까 보낸 signup API 호출 로직과 동일)
+        // 성공 시 localStorage.setItem('accessToken', ...) 후 location.href = '/'
+    }
+</script>
+</body>
+</html>
