@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     <title>Receipt Master | 메인</title>
     <style>
-        :root { --kakao-color: #FEE500; --google-color: #4285F4; }
+        :root { --kakao-color: #FEE500; --google-color: #4285F4; --main-color: #4CAF50; }
         body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-        .btn { display: block; padding: 12px; margin: 10px 0; border-radius: 8px; text-decoration: none; font-weight: bold; transition: 0.3s; border: none; font-size: 0.95rem; }
+        .btn { display: block; padding: 12px; margin: 10px 0; border-radius: 8px; text-decoration: none; font-weight: bold; transition: 0.3s; border: none; font-size: 0.95rem; cursor: pointer; }
         .btn-google { background: var(--google-color); color: white; }
         .btn-kakao { background: var(--kakao-color); color: #3c1e1e; }
-        .btn-signup { background: #4CAF50; color: white; } /* 일반 회원가입 버튼 */
+        .btn-signin { background: var(--main-color); color: white; }
+        .btn-signup { border: 1px solid var(--main-color); color: var(--main-color); background: white; }
         .hidden { display: none; }
+        .divider { margin: 20px 0; display: flex; align-items: center; color: #ccc; font-size: 0.8rem; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #eee; margin: 0 10px; }
         #loading-section { color: #666; font-style: italic; }
     </style>
 </head>
@@ -21,41 +24,49 @@
 
     <div id="intro-section">
         <p><strong>영수증 관리의 시작</strong></p>
-        <p style="font-size: 0.85rem; color: #888; margin-bottom: 25px;">간편한 소셜 로그인 또는 일반 회원가입을 선택하세요.</p>
+        <p style="font-size: 0.85rem; color: #888; margin-bottom: 25px;">간편하게 시작하세요.</p>
 
         <a href="/oauth2/authorization/google" class="btn btn-google">Google로 시작하기</a>
-
         <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao로 시작하기</a>
 
-        <div style="margin: 20px 0; color: #ddd; font-size: 0.8rem;">OR</div>
+        <div class="divider">또는</div>
 
-        <a href="/signup.html" class="btn btn-signup">이메일로 회원가입</a>
-
-        <p style="margin-top: 15px; font-size: 0.8rem;">
-            이미 계정이 있나요? <a href="/signin.html" style="color: #666;">로그인</a>
-        </p>
+        <a href="/signin.html" class="btn btn-signin">이메일로 로그인</a>
+        <a href="/signup.html" class="btn btn-signup">새로 가입하기</a>
     </div>
 
     <div id="loading-section" class="hidden">
         <p>🔍 워크스페이스 확인 중...</p>
+        <p style="font-size: 0.8rem; color: #999; margin-top: 10px;">로그인 상태가 확인되었습니다.</p>
+        <button onclick="logout()" style="margin-top: 20px; border: none; background: none; color: #cc0000; cursor: pointer; text-decoration: underline;">로그아웃 테스트</button>
     </div>
 </div>
 
 <script>
+    function logout() {
+        localStorage.clear();
+        location.href = "/";
+    }
+
     window.onload = () => {
+        // 1. URL 주소창에서 토큰 추출 (소셜 로그인용)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+
+        if (tokenFromUrl) {
+            localStorage.setItem('accessToken', tokenFromUrl);
+            window.history.replaceState({}, document.title, "/");
+        }
+
+        // 2. 토큰 확인
         const token = localStorage.getItem('accessToken');
 
-        // 이미 로그인 된 상태라면 워크스페이스 체크 로직 가동
         if (token) {
+            // 3. 로그인 상태면 UI 전환 후 그대로 멈춤
             document.getElementById('intro-section').classList.add('hidden');
             document.getElementById('loading-section').classList.remove('hidden');
 
-            // 1.5초 후 워크스페이스 유무에 따라 리다이렉트 (시뮬레이션)
-            setTimeout(() => {
-                const workspaceCount = 0; // 0이면 join으로, 1이상이면 진입
-                if (workspaceCount === 0) location.href = "/workspaces/join";
-                else location.href = "/workspaces/main";
-            }, 1500);
+            console.log("로그인 성공! 토큰 보관 중:", token);
         }
     };
 </script>

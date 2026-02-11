@@ -6,27 +6,92 @@
     <style>
         body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { margin-bottom: 30px; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .btn-submit { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-submit:disabled { background: #ccc; }
+        .btn-submit { width: 100%; padding: 12px; background: #5cb85c; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 1rem; }
+        .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+        .error-msg { color: #d9534f; font-size: 0.8rem; margin-bottom: 5px; display: none; }
     </style>
 </head>
 <body>
 <div class="container">
     <h2>일반 회원가입</h2>
+
     <input type="email" id="email" placeholder="이메일">
     <input type="text" id="name" placeholder="표시명 (닉네임)">
     <input type="password" id="password" placeholder="비밀번호">
     <input type="password" id="confirm" placeholder="비밀번호 확인">
+
     <button onclick="doSignup()" id="signup-btn" class="btn-submit">가입하기</button>
-    <p style="text-align: center; margin-top: 15px;"><a href="/" style="font-size: 0.8rem; color: #999;">취소하고 돌아가기</a></p>
+
+    <p style="text-align: center; margin-top: 15px;">
+        <a href="/signin.html" style="font-size: 0.8rem; color: #999; text-decoration: none;">취소하고 돌아가기</a>
+    </p>
 </div>
 
 <script>
-    async function doSignup() {
-        // ... (아까 보낸 signup API 호출 로직과 동일)
-        // 성공 시 localStorage.setItem('accessToken', ...) 후 location.href = '/'
+    // 로그인 상태라면 메인으로 튕겨내기 (명세서 규칙)
+    if (localStorage.getItem('accessToken')) {
+        location.href = "/";
     }
+
+    async function doSignup() {
+        const email = document.getElementById('email').value;
+        const name = document.getElementById('name').value;
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirm').value;
+        const btn = document.getElementById('signup-btn');
+
+        // 1. 프론트엔드 기본 검증 (명세서 기준)
+        if (!email) return alert("이메일은 필수 입력입니다.");
+        if (!name) return alert("표시명은 필수 입력입니다.");
+        if (!password) return alert("비밀번호는 필수 입력입니다.");
+        if (password !== confirm) return alert("비밀번호가 일치하지 않습니다.");
+
+        try {
+            // 2. 버튼 비활성화 (중복 클릭 방지)
+            btn.disabled = true;
+            btn.innerText = "가입 중...";
+
+            // 3. 백엔드 API 호출
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, password })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 4. 성공 시 처리 (자동 로그인 로직 적용)
+                alert("회원가입에 성공했습니다!");
+                if (result.accessToken) {
+                    localStorage.setItem('accessToken', result.accessToken);
+                    location.href = "/"; // 성공 시 메인(워크스페이스 판단 로직)으로 이동
+                } else {
+                    location.href = "/signin.html"; // 토큰 없으면 로그인창으로
+                }
+            } else {
+                // 5. 백엔드 에러 코드 처리 (중복 이메일 등)
+                if (result.code === 'AUTH_EMAIL_ALREADY_EXISTS') {
+                    alert("이미 사용 중인 이메일입니다.");
+                } else {
+                    alert(result.message || "가입 중 오류가 발생했습니다.");
+                }
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("서버와 연결할 수 없습니다.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "가입하기";
+        }
+    }
+
+    // 엔터키 지원
+    document.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') doSignup();
+    });
 </script>
 </body>
 </html>

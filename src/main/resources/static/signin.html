@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt Master | 로그인</title>
+    <style>
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { margin-bottom: 25px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-login { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 1rem; }
+        .btn-login:disabled { background: #ccc; }
+        .link-group { text-align: center; margin-top: 20px; font-size: 0.85rem; }
+        .link-group a { color: #666; text-decoration: none; margin: 0 5px; }
+        .link-group a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>로그인</h2>
+    <input type="email" id="email" placeholder="이메일">
+    <input type="password" id="password" placeholder="비밀번호">
+    <button onclick="handleLogin()" id="login-btn" class="btn-login">로그인</button>
+
+    <div class="link-group">
+        <a href="/signup.html">회원가입</a> |
+        <a href="/">홈으로</a>
+    </div>
+</div>
+
+<script>
+    async function handleLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('login-btn');
+
+        if (!email || !password) return alert("이메일과 비밀번호를 입력해주세요.");
+
+        try {
+            btn.disabled = true;
+            btn.innerText = "인증 중...";
+
+            const response = await fetch('/api/auth/signin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 로그인 성공: JWT 및 유저 정보 저장
+                localStorage.setItem('accessToken', result.accessToken);
+                localStorage.setItem('userEmail', result.email);
+                localStorage.setItem('userName', result.name);
+
+                alert(result.name + "님, 환영합니다!");
+                location.href = "/"; // 메인으로 이동하여 워크스페이스 체크
+            } else {
+                // AuthService에서 던진 에러 메시지 처리
+                if (result.message === "AUTH_INVALID_CREDENTIAL") {
+                    alert("이메일 또는 비밀번호가 잘못되었습니다.");
+                } else if (result.message === "AUTH_SOCIAL_USER_EXISTS") {
+                    alert("소셜 계정(구글/카카오)으로 가입된 메일입니다. 소셜 로그인을 이용해 주세요.");
+                } else {
+                    alert("오류: " + result.message);
+                }
+            }
+        } catch (e) {
+            alert("서버와 통신할 수 없습니다.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "로그인";
+        }
+    }
+
+    // 엔터키 로그인 지원
+    document.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
+</script>
+</body>
+</html>
