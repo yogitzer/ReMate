@@ -57,10 +57,13 @@ dependencies {
     // 3. 기원님: 네이버 OCR JSON 데이터 처리를 위한 라이브러리
     implementation 'org.json:json:20231013'
 
-    // 4. 기원님: Swagger (OpenAPI 3) 추가
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+    // 스웨거 버전 2.3.0에서 2.7.0으로 변경
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
 
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    //유효성 검사를 위한 라이브러리
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
 }
 
 tasks.named('test') {
