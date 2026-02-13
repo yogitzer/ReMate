@@ -40,7 +40,8 @@
             btn.disabled = true;
             btn.innerText = "인증 중...";
 
-            const response = await fetch('/api/auth/signin', {
+            // 1. 경로 수정: /api/v1 추가
+            const response = await fetch('/api/v1/auth/signin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -49,24 +50,34 @@
             const result = await response.json();
 
             if (response.ok) {
-                // 로그인 성공: JWT 및 유저 정보 저장
-                localStorage.setItem('accessToken', result.accessToken);
-                localStorage.setItem('userEmail', result.email);
-                localStorage.setItem('userName', result.name);
+                // 2. 데이터 구조 수정: result.data 에서 꺼내기
+                // 백엔드 LoginResponse 규격에 맞춰 수정
+                const loginData = result; // 만약 AuthService에서 직접 반환한다면 result, 공통응답에 싸여있다면 result.data
 
-                alert(result.name + "님, 환영합니다!");
-                location.href = "/"; // 메인으로 이동하여 워크스페이스 체크
+                // 만약 공통 응답(success: true) 구조라면 아래처럼 사용
+                const token = result.accessToken || (result.data && result.data.accessToken);
+                const userEmail = result.email || (result.data && result.data.email);
+                const userName = result.name || (result.data && result.data.name);
+
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('userEmail', userEmail);
+                localStorage.setItem('userName', userName);
+
+                alert(userName + "님, 환영합니다!");
+                location.href = "/";
             } else {
-                // AuthService에서 던진 에러 메시지 처리
-                if (result.message === "AUTH_INVALID_CREDENTIAL") {
+                // 3. 에러 메시지 구조 수정 (result.error.code 또는 result.error.message)
+                const errorCode = result.error ? result.error.code : result.message;
+                const errorMsg = result.error ? result.error.message : result.message;
+
+                if (errorCode === "AUTH_INVALID_CREDENTIAL") {
                     alert("이메일 또는 비밀번호가 잘못되었습니다.");
-                } else if (result.message === "AUTH_SOCIAL_USER_EXISTS") {
-                    alert("소셜 계정(구글/카카오)으로 가입된 메일입니다. 소셜 로그인을 이용해 주세요.");
                 } else {
-                    alert("오류: " + result.message);
+                    alert("로그인 실패: " + (errorMsg || "알 수 없는 오류"));
                 }
             }
         } catch (e) {
+            console.error(e);
             alert("서버와 통신할 수 없습니다.");
         } finally {
             btn.disabled = false;
@@ -74,7 +85,6 @@
         }
     }
 
-    // 엔터키 로그인 지원
     document.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
 </script>
 </body>
