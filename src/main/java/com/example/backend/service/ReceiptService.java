@@ -171,8 +171,17 @@ public class ReceiptService {
         && (h[3] & 0xFF) == 0x47;
   }
 
-  public List<Receipt> getAllReceipts() {
-    return receiptRepository.findAll();
+  public List<Receipt> getReceipts(Long userId, boolean isAdmin) {
+    if (isAdmin) {
+      return receiptRepository.findAll();
+    }
+    return receiptRepository.findAllByUserId(userId);
+  }
+
+  public Receipt getReceiptSecurely(Long id, Long userId) {
+    return receiptRepository
+            .findByIdAndUserId(id, userId)
+            .orElseThrow(() -> new RuntimeException("RECEIPT_NOT_FOUND"));
   }
 
   public byte[] generateCsv(List<Receipt> receipts) {
@@ -194,18 +203,16 @@ public class ReceiptService {
   }
 
   @Transactional
-  public Receipt updateStatus(Long id, ReceiptStatus status) {
-    Receipt receipt =
-        receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("RECEIPT_NOT_FOUND"));
+  public Receipt updateStatus(Long id, Long userId, ReceiptStatus status) {
+    Receipt receipt = getReceiptSecurely(id, userId);
     receipt.updateStatus(status);
     return receipt;
   }
 
   @Transactional
   public Receipt updateReceipt(
-      Long id, Integer totalAmount, String storeName, LocalDateTime tradeAt) {
-    Receipt receipt =
-        receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("RECEIPT_NOT_FOUND"));
+      Long id, Long userId, Integer totalAmount, String storeName, LocalDateTime tradeAt) {
+    Receipt receipt = getReceiptSecurely(id, userId);
     receipt.updateInfo(totalAmount, storeName, tradeAt);
     return receipt;
   }

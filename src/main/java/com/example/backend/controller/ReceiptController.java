@@ -4,7 +4,6 @@ import com.example.backend.domain.receipt.ReceiptStatus;
 import com.example.backend.entity.Receipt;
 import com.example.backend.service.ReceiptService;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,13 +24,13 @@ public class ReceiptController {
 
   @GetMapping
   public ResponseEntity<List<Receipt>> getAllReceipts() {
-    return ResponseEntity.ok(receiptService.getAllReceipts());
+    return ResponseEntity.ok(receiptService.getReceipts(1L, false));
   }
 
   @GetMapping("/export")
   public ResponseEntity<byte[]> exportToCsv() {
     try {
-      List<Receipt> receipts = receiptService.getAllReceipts();
+      List<Receipt> receipts = receiptService.getReceipts(1L, false);
       byte[] out = receiptService.generateCsv(receipts);
 
       return ResponseEntity.ok()
@@ -64,20 +63,15 @@ public class ReceiptController {
   @PatchMapping("/{id}/status")
   public ResponseEntity<Receipt> updateStatus(
       @PathVariable Long id, @RequestParam ReceiptStatus status) {
-    return ResponseEntity.ok(receiptService.updateStatus(id, status));
+    return ResponseEntity.ok(receiptService.updateStatus(id, 1L, status));
   }
 
   @PutMapping("/{id}")
   public ResponseEntity<Receipt> updateReceipt(
-      @PathVariable Long id,
-      @RequestParam Integer totalAmount,
-      @RequestParam String storeName,
-      @RequestParam String tradeAt) {
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    LocalDateTime tradeDateTime = LocalDateTime.parse(tradeAt, formatter);
-
+      @PathVariable Long id, @RequestBody ReceiptUpdateRequest request) {
     return ResponseEntity.ok(
-        receiptService.updateReceipt(id, totalAmount, storeName, tradeDateTime));
+        receiptService.updateReceipt(
+            id, 1L, request.totalAmount(), request.storeName(), request.tradeAt()));
   }
 
   @PostMapping(value = "/upload/multiple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -93,4 +87,7 @@ public class ReceiptController {
     List<Receipt> results = receiptService.uploadMultiple(files, wId, uId);
     return ResponseEntity.ok(results);
   }
+
+  public static record ReceiptUpdateRequest(
+      Integer totalAmount, String storeName, LocalDateTime tradeAt) {}
 }
