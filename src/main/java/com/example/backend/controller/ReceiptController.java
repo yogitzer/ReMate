@@ -1,11 +1,14 @@
 package com.example.backend.controller;
 
+import com.example.backend.domain.receipt.ReceiptStatus;
 import com.example.backend.entity.Receipt;
-import com.example.backend.ocr.GoogleOcrClient;
 import com.example.backend.service.ReceiptService;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 @CrossOrigin(origins = "*")
 public class ReceiptController {
 
-  private final GoogleOcrClient googleOcrClient;
   private final ReceiptService receiptService;
 
   @GetMapping
@@ -33,13 +35,11 @@ public class ReceiptController {
       byte[] out = receiptService.generateCsv(receipts);
 
       return ResponseEntity.ok()
-          .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
-          .header(
-              org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
-              "attachment; filename=receipt_list.csv")
+          .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+          .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt_list.csv")
           .body(out);
     } catch (Exception e) {
-      log.error("CSV 생성 실패: ", e);
+      log.error("CSV 생성 실패", e);
       return ResponseEntity.internalServerError().build();
     }
   }
@@ -56,26 +56,28 @@ public class ReceiptController {
       Receipt receipt = receiptService.uploadAndProcess(idempotencyKey, file, workspaceId, userId);
       return ResponseEntity.ok(receipt);
     } catch (Exception e) {
-      log.error("업로드 실패: ", e);
+      log.error("업로드 실패", e);
       return ResponseEntity.internalServerError().body(e.getMessage());
     }
   }
 
   @PatchMapping("/{id}/status")
   public ResponseEntity<Receipt> updateStatus(
-      @PathVariable("id") Long id,
-      @RequestParam("status") com.example.backend.domain.receipt.ReceiptStatus status) {
+      @PathVariable Long id, @RequestParam ReceiptStatus status) {
     return ResponseEntity.ok(receiptService.updateStatus(id, status));
   }
 
-  @PatchMapping("/{id}")
-  public Receipt updateReceipt(
+  @PutMapping("/{id}")
+  public ResponseEntity<Receipt> updateReceipt(
       @PathVariable Long id,
-      @RequestParam(required = false) Integer totalAmount,
-      @RequestParam(required = false) String storeName,
-      @RequestParam(required = false) String tradeDate) {
+      @RequestParam Integer totalAmount,
+      @RequestParam String storeName,
+      @RequestParam String tradeAt) {
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    LocalDateTime tradeDateTime = LocalDateTime.parse(tradeAt, formatter);
 
-    return receiptService.updateReceipt(id, totalAmount, storeName, tradeDate);
+    return ResponseEntity.ok(
+        receiptService.updateReceipt(id, totalAmount, storeName, tradeDateTime));
   }
 
   @PostMapping(value = "/upload/multiple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -83,9 +85,7 @@ public class ReceiptController {
       @RequestPart("files") List<MultipartFile> files,
       @RequestPart("workspaceId") String workspaceId,
       @RequestPart("userId") String userId) {
-    if (files == null || files.isEmpty()) {
-      return ResponseEntity.badRequest().build();
-    }
+    if (files == null || files.isEmpty()) return ResponseEntity.badRequest().build();
 
     Long wId = Long.parseLong(workspaceId);
     Long uId = Long.parseLong(userId);

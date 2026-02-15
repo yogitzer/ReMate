@@ -2,8 +2,8 @@ package com.example.backend.service;
 
 import com.example.backend.domain.receipt.ReceiptStatus;
 import com.example.backend.entity.Receipt;
+import com.example.backend.ocr.GeminiService;
 import com.example.backend.ocr.GoogleOcrClient;
-import com.example.backend.ocr.ReceiptParser;
 import com.example.backend.repository.ReceiptRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
@@ -30,12 +32,12 @@ public class ReceiptService {
 
   private final ReceiptRepository receiptRepository;
   private final GoogleOcrClient googleOcrClient;
+  private final GeminiService geminiService;
 
   @Transactional
   public Receipt uploadAndProcess(
       String idempotencyKey, MultipartFile file, Long workspaceId, Long userId) {
     validateFile(file);
-
     try {
       byte[] fileBytes = file.getBytes();
       byte[] hashBytes = MessageDigest.getInstance("MD5").digest(fileBytes);
@@ -51,9 +53,7 @@ public class ReceiptService {
                           () -> {
                             try {
                               String savedFileName = saveFileToLocal(file);
-
                               JsonNode ocrJson = googleOcrClient.recognize(fileBytes);
-
                               return parseAndSave(
                                   idempotencyKey,
                                   fileHash,
@@ -62,7 +62,7 @@ public class ReceiptService {
                                   userId,
                                   savedFileName);
                             } catch (Exception e) {
-                              log.error("OCR 분석 중 에러: ", e);
+                              log.error("OCR 분석 에러", e);
                               throw new RuntimeException("OCR_PROCESSING_FAILED");
                             }
                           }));
@@ -82,46 +82,62 @@ public class ReceiptService {
     String fullText =
         textAnnotations.isMissingNode() ? "" : textAnnotations.get(0).path("description").asText();
 
-    String storeName = ReceiptParser.extractStoreName(fullText);
-    int totalAmount = ReceiptParser.extractTotalAmount(fullText);
-    String tradeDate = ReceiptParser.extractTradeDate(fullText);
+    JsonNode aiResult = geminiService.getParsedReceipt(fullText);
 
-    Receipt receipt =
+    String storeName = aiResult.path("storeName").asText("알 수 없는 상호");
+    int totalAmount = aiResult.path("totalAmount").asInt(0);
+    String tradeAtStr = aiResult.path("tradeAt").asText();
+
+    ReceiptStatus finalStatus =
+        (aiResult.has("storeName") && !storeName.equals("알 수 없는 상호"))
+            ? ReceiptStatus.WAITING
+            : ReceiptStatus.NEED_MANUAL;
+
+    LocalDateTime tradeAt;
+    try {
+      tradeAt = LocalDateTime.parse(tradeAtStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    } catch (Exception e) {
+      tradeAt = LocalDateTime.now();
+    }
+
+    boolean isNightTime = (tradeAt.getHour() >= 23 || tradeAt.getHour() < 6);
+
+    return receiptRepository.save(
         Receipt.builder()
             .idempotencyKey(key)
             .fileHash(fileHash)
             .workspaceId(workspaceId)
             .userId(userId)
-            .status(ReceiptStatus.ANALYZING)
+            .status(finalStatus)
             .storeName(storeName)
             .totalAmount(totalAmount)
-            .tradeDate(tradeDate)
-            .rawText(ocrJson.toString())
+            .tradeAt(tradeAt)
+            .nightTime(isNightTime)
+            .rawText(fullText)
             .filePath(filePath)
-            .build();
-
-    return receiptRepository.save(receipt);
+            .build());
   }
 
   private String saveFileToLocal(MultipartFile file) {
     try {
       String uploadDir = "C:/receipt_uploads/";
       File dir = new File(uploadDir);
-      if (!dir.exists()) dir.mkdirs();
-
-      String originalFilename = file.getOriginalFilename();
-      String extension = "";
-      if (originalFilename != null && originalFilename.contains(".")) {
-        extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+      if (!dir.exists() && !dir.mkdirs()) {
+        throw new IOException("디렉토리 생성 실패");
       }
 
-      String savedFileName = UUID.randomUUID().toString() + extension;
+      String originalFilename = file.getOriginalFilename();
+      String extension =
+          (originalFilename != null && originalFilename.contains("."))
+              ? originalFilename.substring(originalFilename.lastIndexOf("."))
+              : "";
+
+      String savedFileName = UUID.randomUUID() + extension;
       Path targetPath = Paths.get(uploadDir + savedFileName);
       Files.copy(file.getInputStream(), targetPath);
 
       return savedFileName;
     } catch (IOException e) {
-      log.error("파일 저장 실패: ", e);
       throw new RuntimeException("FILE_SAVE_FAILED");
     }
   }
@@ -140,17 +156,18 @@ public class ReceiptService {
     return receiptRepository.findAll();
   }
 
+  // 빌드 오류 해결을 위해 다시 추가한 CSV 생성 메서드
   public byte[] generateCsv(List<Receipt> receipts) {
     StringBuilder csv = new StringBuilder();
     csv.append('\ufeff');
     csv.append("번호,상호명,날짜,금액\n");
-
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     for (Receipt r : receipts) {
       csv.append(r.getId())
           .append(",")
           .append(r.getStoreName())
           .append(",")
-          .append(r.getTradeDate())
+          .append(r.getTradeAt() != null ? r.getTradeAt().format(formatter) : "")
           .append(",")
           .append(r.getTotalAmount())
           .append("\n");
@@ -167,10 +184,11 @@ public class ReceiptService {
   }
 
   @Transactional
-  public Receipt updateReceipt(Long id, Integer totalAmount, String storeName, String tradeDate) {
+  public Receipt updateReceipt(
+      Long id, Integer totalAmount, String storeName, LocalDateTime tradeAt) {
     Receipt receipt =
         receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("RECEIPT_NOT_FOUND"));
-    receipt.updateInfo(totalAmount, storeName, tradeDate);
+    receipt.updateInfo(totalAmount, storeName, tradeAt);
     return receipt;
   }
 
@@ -180,10 +198,8 @@ public class ReceiptService {
         .map(
             file -> {
               try {
-                String tempKey = "multi-" + UUID.randomUUID();
-                return uploadAndProcess(tempKey, file, workspaceId, userId);
+                return uploadAndProcess("multi-" + UUID.randomUUID(), file, workspaceId, userId);
               } catch (Exception e) {
-                log.error("파일 업로드 중 개별 실패: {}", file.getOriginalFilename(), e);
                 return null;
               }
             })

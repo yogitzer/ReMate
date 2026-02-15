@@ -1,9 +1,12 @@
 package com.example.backend.domain.receipt;
 
 public enum ReceiptStatus {
+  UPLOADED,
   ANALYZING,
-  PENDING,
+  WAITING,
+  NEED_MANUAL,
   APPROVED,
   REJECTED,
-  FAILED_SYSTEM
+  FAILED_SYSTEM,
+  EXPIRED
 }

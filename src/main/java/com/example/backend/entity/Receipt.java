@@ -23,9 +23,11 @@ public class Receipt {
 
   private String storeName;
 
-  private String tradeDate;
+  private LocalDateTime tradeAt;
 
   private int totalAmount;
+
+  private boolean nightTime;
 
   @Column(unique = true)
   private String idempotencyKey;
@@ -59,15 +61,15 @@ public class Receipt {
     this.status = status;
   }
 
-  public void updateInfo(Integer totalAmount, String storeName, String tradeDate) {
+  public void updateInfo(Integer totalAmount, String storeName, LocalDateTime tradeAt) {
     if (totalAmount != null) {
       this.totalAmount = totalAmount;
     }
     if (storeName != null && !storeName.isEmpty()) {
       this.storeName = storeName;
     }
-    if (tradeDate != null && !tradeDate.isEmpty()) {
-      this.tradeDate = tradeDate;
+    if (tradeAt != null) {
+      this.tradeAt = tradeAt;
     }
     this.status = ReceiptStatus.APPROVED;
   }
