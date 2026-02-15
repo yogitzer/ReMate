@@ -30,6 +30,11 @@ public class Receipt {
   @Column(unique = true)
   private String idempotencyKey;
 
+  @Column(name = "file_hash", unique = true)
+  private String fileHash;
+
+  private String filePath;
+
   @Lob
   @Column(columnDefinition = "LONGTEXT")
   private String rawText;
@@ -53,5 +58,17 @@ public class Receipt {
   public void updateStatus(ReceiptStatus status) {
     this.status = status;
   }
-}
 
+  public void updateInfo(Integer totalAmount, String storeName, String tradeDate) {
+    if (totalAmount != null) {
+      this.totalAmount = totalAmount;
+    }
+    if (storeName != null && !storeName.isEmpty()) {
+      this.storeName = storeName;
+    }
+    if (tradeDate != null && !tradeDate.isEmpty()) {
+      this.tradeDate = tradeDate;
+    }
+    this.status = ReceiptStatus.APPROVED;
+  }
+}

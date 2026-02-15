@@ -4,50 +4,69 @@
     <meta charset="UTF-8">
     <title>Receipt Master | 분석 및 관리</title>
     <style>
-        body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 95%; max-width: 800px; margin-bottom: 20px; }
-        .preview { max-width: 200px; margin: 15px auto; border-radius: 8px; display: none; border: 1px solid #ddd; }
-        .btn-main { background: #333; color: white; padding: 12px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        :root { --primary: #3b82f6; --bg: #f8fafc; --card: #ffffff; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); margin: 0; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; color: #1e293b; }
+        .card { background: var(--card); padding: 32px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 900px; margin-bottom: 24px; }
+        h2, h3 { margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 25px; font-size: 0.9rem; }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
-        th { background-color: #f8f9fa; color: #555; }
+        .upload-zone { border: 2px dashed #e2e8f0; padding: 40px; border-radius: 16px; margin-bottom: 20px; transition: 0.3s; cursor: pointer; }
+        .upload-zone:hover { border-color: var(--primary); background: #f0f7ff; }
 
-        .status-badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
-        .ANALYZING { background: #fff3cd; color: #856404; }
-        .APPROVED { background: #d4edda; color: #155724; }
-        .REJECTED { background: #f8d7da; color: #721c24; }
+        .progress-container { width: 100%; background: #e2e8f0; border-radius: 100px; height: 8px; margin: 20px 0; display: none; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: var(--primary); transition: 0.3s; }
 
-        .action-btn { padding: 5px 10px; margin: 2px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer; background: white; }
-        .btn-approve { color: #28a745; border-color: #28a745; }
-        .btn-reject { color: #dc3545; border-color: #dc3545; }
+        .btn-main { background: #1e293b; color: white; padding: 14px 28px; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; width: 100%; font-size: 1rem; }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px; }
+        th { background: #f1f5f9; padding: 16px; font-weight: 600; font-size: 0.85rem; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 16px; text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+        tr:hover { background: #f8fafc; }
+
+        .status-badge { padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; }
+        .ANALYZING { background: #fef3c7; color: #92400e; }
+        .APPROVED { background: #dcfce7; color: #166534; }
+        .REJECTED { background: #fee2e2; color: #991b1b; }
+
+        .action-btn { padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; background: white; font-size: 0.85rem; font-weight: 600; transition: 0.2s; }
+        .btn-approve:hover { color: #166534; background: #dcfce7; border-color: #dcfce7; }
+        .btn-reject:hover { color: #991b1b; background: #fee2e2; border-color: #fee2e2; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2>📸 영수증 업로드</h2>
-    <input type="file" id="fileInput" accept="image/*" onchange="previewImage(this)">
-    <img id="imagePreview" class="preview">
-    <button onclick="uploadReceipt()" class="btn-main">AI 분석 시작</button>
-    <p id="status" style="margin-top:10px; color:#666;"></p>
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <p style="margin:0; color:#64748b;">파일을 클릭하거나 여기로 드래그하세요 (다중 선택 가능)</p>
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="previewImage(this)">
+    </div>
+    <img id="imagePreview" class="preview" style="max-width: 150px; display:none; margin: 0 auto 20px; border-radius: 8px;">
+
+    <div class="progress-container" id="progCont">
+        <div class="progress-bar" id="progBar"></div>
+    </div>
+
+    <button onclick="uploadReceipts()" class="btn-main">AI 분석 시작하기</button>
+    <p id="status" style="margin-top:15px; font-size: 0.9rem; color:#64748b; font-weight: 500;"></p>
 </div>
 
 <div class="card">
-    <h3>📋 분석된 영수증 내역
-        <button onclick="fetchReceipts()" style="float: right; font-size: 0.8rem;">🔄 새로고침</button>
-        <button onclick="location.href='/api/receipts/export'" style="float: right; font-size: 0.8rem; margin-right: 5px;">📥 CSV 저장</button>
-    </h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin:0">📋 분석된 영수증 내역</h3>
+        <div>
+            <button onclick="fetchReceipts()" class="action-btn">🔄 새로고침</button>
+            <button onclick="location.href='/api/receipts/export'" class="action-btn" style="background:#1e293b; color:white">📥 CSV 저장</button>
+        </div>
+    </div>
     <table>
         <thead>
         <tr>
             <th>ID</th><th>상호명</th><th>날짜</th><th>금액</th><th>상태</th><th>관리</th>
         </tr>
         </thead>
-        <tbody id="receiptList">
-        </tbody>
+        <tbody id="receiptList"></tbody>
     </table>
-    <button onclick="location.href='/'" style="margin-top:20px; background:none; border:none; color:#999; text-decoration:underline; cursor:pointer;">홈으로 돌아가기</button>
+    <button onclick="location.href='/'" style="margin-top:30px; background:none; border:none; color:#94a3b8; text-decoration:underline; cursor:pointer; font-size: 0.85rem;">← 홈으로 돌아가기</button>
 </div>
 
 <script>
@@ -60,7 +79,6 @@
         }
     }
 
-    // 1. 목록 불러오기
     async function fetchReceipts() {
         try {
             const response = await fetch('/api/receipts');
@@ -68,54 +86,58 @@
             const html = list.map(r => `
                 <tr>
                     <td>${r.id}</td>
-                    <td><strong>${r.storeName}</strong></td>
+                    <td style="text-align:left"><strong>${r.storeName}</strong></td>
                     <td>${r.tradeDate || '-'}</td>
-                    <td>${r.totalAmount.toLocaleString()}원</td>
+                    <td style="font-weight:700">${r.totalAmount.toLocaleString()}원</td>
                     <td><span class="status-badge ${r.status}">${r.status}</span></td>
                     <td>
+                        ${r.filePath ? `<button class="action-btn" onclick="window.open('/images/${r.filePath}', '_blank')">🖼️ 보기</button>` : '-'}
                         <button class="action-btn btn-approve" onclick="updateStatus(${r.id}, 'APPROVED')">승인</button>
                         <button class="action-btn btn-reject" onclick="updateStatus(${r.id}, 'REJECTED')">반려</button>
                     </td>
                 </tr>
             `).join('');
             document.getElementById('receiptList').innerHTML = html || '<tr><td colspan="6">데이터가 없습니다.</td></tr>';
-        } catch (e) { console.error("목록 로드 실패", e); }
+        } catch (e) { console.error(e); }
     }
 
-    // 2. 업로드 및 분석
-    async function uploadReceipt() {
-        const file = document.getElementById('fileInput').files[0];
-        const token = localStorage.getItem('accessToken');
+    async function uploadReceipts() {
+        const fileInput = document.getElementById('fileInput');
+        const files = fileInput.files;
         const statusText = document.getElementById('status');
+        const progCont = document.getElementById('progCont');
+        const progBar = document.getElementById('progBar');
 
-        if (!file) return alert("영수증 사진을 선택해주세요!");
+        if (files.length === 0) return alert("영수증 사진을 선택해주세요!");
 
-        statusText.innerText = "⏳ AI 분석 중...";
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('workspaceId', 1);
-        formData.append('userId', 1);
+        progCont.style.display = 'block';
 
-        try {
-            const response = await fetch('/api/receipts/upload', {
-                method: 'POST',
-                headers: {
-                    'X-IDEMPOTENCY-KEY': 'key-' + Date.now()
-                    // 'Authorization': 'Bearer ' + token // 필요 시 주석 해제
-                },
-                body: formData
-            });
+        for (let i = 0; i < files.length; i++) {
+            const percent = Math.round(((i + 1) / files.length) * 100);
+            progBar.style.width = percent + '%';
+            statusText.innerText = `⏳ AI 분석 중... (${i + 1}/${files.length})`;
 
-            if (response.ok) {
-                statusText.innerText = "✅ 분석 성공!";
-                fetchReceipts(); // 목록 갱신
-            } else {
-                statusText.innerText = "❌ 분석 실패";
-            }
-        } catch (error) { statusText.innerText = "❌ 에러 발생"; }
+            const formData = new FormData();
+            formData.append('file', files[i]);
+            formData.append('workspaceId', 1);
+            formData.append('userId', 1);
+
+            try {
+                await fetch('/api/receipts/upload', {
+                    method: 'POST',
+                    headers: { 'X-IDEMPOTENCY-KEY': 'key-' + Date.now() + '-' + i },
+                    body: formData
+                });
+            } catch (error) { console.error(error); }
+        }
+
+        statusText.innerText = `✅ 분석 완료! (${files.length}건)`;
+        setTimeout(() => { progCont.style.display = 'none'; progBar.style.width = '0%'; }, 2000);
+        fetchReceipts();
+        fileInput.value = "";
+        document.getElementById('imagePreview').style.display = 'none';
     }
 
-    // 3. 상태 변경
     async function updateStatus(id, status) {
         await fetch(`/api/receipts/${id}/status?status=${status}`, { method: 'PATCH' });
         fetchReceipts();
