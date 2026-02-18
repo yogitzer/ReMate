@@ -205,7 +205,6 @@ public class ReceiptService {
       tradeAt = LocalDateTime.now();
     }
 
-
     Receipt tempReceiptForTagging = Receipt.builder().tradeAt(tradeAt).build();
     List<String> derivedTags = tagService.deriveTags(tempReceiptForTagging);
 
