@@ -1,76 +1,42 @@
 package com.example.backend.config;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.security.Key;
 import java.util.Date;
-import java.util.List;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 @Component
 public class JwtTokenProvider {
-
+  // 테스트용 비밀키 (실제 서비스에서는 아주 복잡한 문자열을 써야 합니다)
   private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-  private final long tokenValidityInMilliseconds = 1000L * 60 * 60 * 10;
+  private final long tokenValidityInMilliseconds = 1000L * 60 * 60 * 10; // 10시간 유지
 
+  // 유저 정보를 받아서 토큰을 만드는 메서드
   public String createToken(String email) {
-    return createToken(email, "MEMBER");
-  }
-
-  public String createToken(String email, String role) {
     Date now = new Date();
     Date validity = new Date(now.getTime() + tokenValidityInMilliseconds);
 
     return Jwts.builder()
-        .setSubject(email)
-        .claim("role", role)
-        .setIssuedAt(now)
-        .setExpiration(validity)
-        .signWith(key)
+        .setSubject(email) // 토큰 주인이 누구인지 (이메일)
+        .setIssuedAt(now) // 언제 만들었는지
+        .setExpiration(validity) // 언제 만료되는지
+        .signWith(key) // 우리만 아는 비밀키로 서명
         .compact();
   }
-
-  public String resolveToken(String authorizationHeader) {
-    if (authorizationHeader == null || authorizationHeader.isBlank()) {
-      return null;
-    }
-
-    if (!authorizationHeader.startsWith("Bearer ")) {
-      return null;
-    }
-
-    String token = authorizationHeader.substring(7).trim();
-    return token.isBlank() ? null : token;
-  }
-
+  // JwtTokenProvider 안에 추가해 주세요
   public boolean validateToken(String token) {
     try {
-      parseClaims(token);
+      Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
       return true;
-    } catch (JwtException | IllegalArgumentException e) {
+    } catch (Exception e) {
       return false;
     }
   }
 
-  public Authentication getAuthentication(String token) {
-    Claims claims = parseClaims(token).getBody();
-
-    String email = claims.getSubject();
-    String role = claims.get("role", String.class);
-    String roleName = (role == null || role.isBlank()) ? "ROLE_MEMBER" : "ROLE_" + role;
-
-    return new UsernamePasswordAuthenticationToken(
-        email, null, List.of(new SimpleGrantedAuthority(roleName)));
-  }
-
-  private Jws<Claims> parseClaims(String token) {
-    return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+  public String getSubject(String token) {
+    return Jwts.parserBuilder().setSigningKey(key).build()
+            .parseClaimsJws(token).getBody().getSubject();
   }
 }

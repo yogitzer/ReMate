@@ -1,71 +1,83 @@
 package com.example.backend.config;
 
-import com.example.backend.global.error.ErrorCode;
+import com.example.backend.util.ErrorCode;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-  private final JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-          throws ServletException, IOException {
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-    String authHeader = request.getHeader("Authorization");
-    String token = jwtTokenProvider.resolveToken(authHeader);
+        String path = request.getRequestURI();
 
-    if (token != null) {
-      try {
-        // 토큰 검증 성공 시 SecurityContext에 인증 정보 저장
-        if (jwtTokenProvider.validateToken(token)) {
-          Authentication auth = jwtTokenProvider.getAuthentication(token);
-          SecurityContextHolder.getContext().setAuthentication(auth);
+        // 1. 로그인, 회원가입, 스웨거 등 인증이 필요 없는 경로는 필터 로직을 건너뜁니다.
+        if (path.startsWith("/api/v1/auth/signup") ||
+                path.startsWith("/api/v1/auth/signin") ||
+                path.startsWith("/v3/api-docs") ||
+                path.startsWith("/swagger-ui")) {
+            filterChain.doFilter(request, response);
+            return;
         }
-      } catch (ExpiredJwtException e) {
-        // 팀원 규격: UNAUTHORIZED 사용
-        sendErrorResponse(response, ErrorCode.UNAUTHORIZED, "토큰이 만료되었습니다. 다시 로그인해주세요.");
-        return;
-      } catch (Exception e) {
-        // 기타 모든 인증 예외 처리
-        sendErrorResponse(response, ErrorCode.UNAUTHORIZED, "유효하지 않은 인증 토큰입니다.");
-        return;
-      }
+
+        String authHeader = request.getHeader("Authorization");
+
+        // 2. Authorization 헤더가 있는 경우 토큰 검증
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+
+            try {
+                if (jwtTokenProvider.validateToken(token)) {
+                    String email = jwtTokenProvider.getSubject(token);
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            email, null, Collections.emptyList());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            } catch (ExpiredJwtException e) {
+                // 토큰 만료 시 공통 에러 규격 응답 후 종료
+                sendErrorResponse(response, ErrorCode.AUTH_UNAUTHORIZED, "토큰이 만료되었습니다.");
+                return;
+            } catch (Exception e) {
+                // 기타 인증 실패 시 공통 에러 규격 응답 후 종료
+                sendErrorResponse(response, ErrorCode.AUTH_UNAUTHORIZED, "인증에 실패했습니다.");
+                return;
+            }
+        }
+
+        // 3. 토큰이 없더라도 permitAll 된 경로일 수 있으므로 다음 필터로 진행
+        filterChain.doFilter(request, response);
     }
 
-    filterChain.doFilter(request, response);
-  }
+    private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
 
-  /**
-   * 팀원의 ApiResponse 규격 + ErrorCode 상수를 활용한 에러 응답
-   */
-  private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode, String message) throws IOException {
-    response.setStatus(errorCode.status().value()); // 팀원의 status() 메서드 활용
-    response.setContentType("application/json;charset=UTF-8");
+        // 명세서 규격: { success, error: { code, message }, meta }
+        String json = String.format(
+                "{\"success\": false, \"error\": {\"code\": \"%s\", \"message\": \"%s\"}, \"meta\": {\"timestamp\": \"%s\", \"traceId\": \"%s\"}}",
+                errorCode.name(), message, LocalDateTime.now(), UUID.randomUUID().toString()
+        );
 
-    // 팀원 명세 규격에 맞춘 JSON (success: false, error: {code, message}, meta: {timestamp, traceId})
-    String json = String.format(
-            "{\"success\": false, \"error\": {\"code\": \"%s\", \"message\": \"%s\"}, \"meta\": {\"timestamp\": \"%s\", \"traceId\": \"%s\"}}",
-            errorCode.name(),
-            message,
-            LocalDateTime.now(),
-            UUID.randomUUID().toString()
-    );
-
-    response.getWriter().write(json);
-  }
+        response.getWriter().write(json);
+    }
 }
