@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt Master | 로그인</title>
+    <style>
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { margin-bottom: 25px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-login { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 1rem; }
+        .btn-login:disabled { background: #ccc; }
+        .link-group { text-align: center; margin-top: 20px; font-size: 0.85rem; }
+        .link-group a { color: #666; text-decoration: none; margin: 0 5px; }
+        .link-group a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>로그인</h2>
+    <input type="email" id="email" placeholder="이메일">
+    <input type="password" id="password" placeholder="비밀번호">
+    <button onclick="handleLogin()" id="login-btn" class="btn-login">로그인</button>
+
+    <div class="link-group">
+        <a href="/signup.html">회원가입</a> |
+        <a href="/">홈으로</a>
+    </div>
+</div>
+
+<script>
+    async function handleLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('login-btn');
+
+        if (!email || !password) return alert("이메일과 비밀번호를 입력해주세요.");
+
+        try {
+            btn.disabled = true;
+            btn.innerText = "인증 중...";
+
+            // 1. 경로 수정: /api/v1 추가
+            const response = await fetch('/api/v1/auth/signin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 2. 데이터 구조 수정: result.data 에서 꺼내기
+                // 백엔드 LoginResponse 규격에 맞춰 수정
+                const loginData = result; // 만약 AuthService에서 직접 반환한다면 result, 공통응답에 싸여있다면 result.data
+
+                // 만약 공통 응답(success: true) 구조라면 아래처럼 사용
+                const token = result.accessToken || (result.data && result.data.accessToken);
+                const userEmail = result.email || (result.data && result.data.email);
+                const userName = result.name || (result.data && result.data.name);
+
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('userEmail', userEmail);
+                localStorage.setItem('userName', userName);
+
+                alert(userName + "님, 환영합니다!");
+                location.href = "/";
+            } else {
+                // 3. 에러 메시지 구조 수정 (result.error.code 또는 result.error.message)
+                const errorCode = result.error ? result.error.code : result.message;
+                const errorMsg = result.error ? result.error.message : result.message;
+
+                if (errorCode === "AUTH_INVALID_CREDENTIAL") {
+                    alert("이메일 또는 비밀번호가 잘못되었습니다.");
+                } else {
+                    alert("로그인 실패: " + (errorMsg || "알 수 없는 오류"));
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            alert("서버와 통신할 수 없습니다.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "로그인";
+        }
+    }
+
+    document.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
+</script>
+</body>
+</html>

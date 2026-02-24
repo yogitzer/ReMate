@@ -71,22 +71,21 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         userNameAttributeName);
   }
 
-  private void saveOrUpdate(
+  private User saveOrUpdate(
       String name, String email, String picture, String provider, String providerId) {
-    userRepository
-        .findByEmail(email)
-        .map(entity -> entity.update(name, picture))
-        .orElseGet(
-            () -> {
-              User newUser =
-                  User.builder()
-                      .name(name)
-                      .email(email)
-                      .picture(picture)
-                      .provider(provider)
-                      .providerId(providerId)
-                      .build();
-              return userRepository.save(newUser);
-            });
+    User user =
+        userRepository
+            .findByEmail(email)
+            .map(entity -> entity.update(name, picture))
+            .orElse(
+                User.builder()
+                    .name(name)
+                    .email(email)
+                    .picture(picture)
+                    .provider(provider)
+                    .providerId(providerId)
+                    .build());
+
+    return userRepository.save(user);
   }
 }

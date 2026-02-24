@@ -1,9 +1,14 @@
 package com.example.backend.service;
 
+import com.example.backend.config.JwtTokenProvider;
 import com.example.backend.domain.User;
 import com.example.backend.dto.AuthStatusResponse;
+import com.example.backend.dto.LoginResponse;
+import com.example.backend.dto.UserRegisterRequestDto;
 import com.example.backend.entity.MembershipStatus;
 import com.example.backend.entity.WorkspaceMember;
+import com.example.backend.global.error.BusinessException;
+import com.example.backend.global.error.ErrorCode;
 import com.example.backend.repository.UserRepository;
 import com.example.backend.repository.WorkspaceMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,13 +23,44 @@ public class AuthService {
   private final UserRepository userRepository;
   private final WorkspaceMemberRepository workspaceMemberRepository;
   private final BCryptPasswordEncoder passwordEncoder;
+  private final JwtTokenProvider jwtTokenProvider;
 
   @Transactional
-  public Long join(String email, String rawPassword, String name) {
-    String encodedPassword = passwordEncoder.encode(rawPassword);
+  public LoginResponse signup(UserRegisterRequestDto dto) {
+    userRepository
+        .findByEmail(dto.getEmail())
+        .ifPresent(
+            user -> {
+              throw new BusinessException(ErrorCode.CONFLICT, "이미 사용 중인 이메일입니다.");
+            });
+
     User user =
-        User.builder().email(email).password(encodedPassword).name(name).provider("local").build();
-    return userRepository.save(user).getId();
+        User.builder()
+            .email(dto.getEmail())
+            .password(passwordEncoder.encode(dto.getPassword()))
+            .name(dto.getName())
+            .provider("local")
+            .providerId(dto.getEmail())
+            .build();
+
+    userRepository.save(user);
+    return login(dto.getEmail(), dto.getPassword());
+  }
+
+  @Transactional(readOnly = true)
+  public LoginResponse login(String email, String password) {
+    User user =
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다."));
+
+    if (!passwordEncoder.matches(password, user.getPassword())) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다.");
+    }
+
+    String token = jwtTokenProvider.createToken(user.getEmail());
+    return new LoginResponse(token, user.getEmail(), user.getName(), 0, null);
   }
 
   @Transactional(readOnly = true)
@@ -56,7 +92,6 @@ public class AuthService {
     com.example.backend.entity.WorkspaceRole role =
         (membership != null) ? membership.getRole() : null;
 
-    // 마지막 인자로 user.getId()를 추가하여 프론트엔드에 전달합니다.
     return new AuthStatusResponse(
         true, user.getEmail(), "인증 성공", workspaceId, user.getName(), role, user.getId());
   }

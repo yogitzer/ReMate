@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt Master | 회원가입</title>
+    <style>
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { margin-bottom: 30px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-submit { width: 100%; padding: 12px; background: #5cb85c; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 1rem; }
+        .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+        .error-msg { color: #d9534f; font-size: 0.8rem; margin-bottom: 5px; display: none; }
+        .link-group { text-align: center; margin-top: 20px; font-size: 0.85rem; }
+        .link-group a { color: #666; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>일반 회원가입</h2>
+
+    <input type="email" id="email" placeholder="이메일">
+    <input type="text" id="name" placeholder="표시명 (닉네임)">
+    <input type="password" id="password" placeholder="비밀번호">
+    <input type="password" id="confirm" placeholder="비밀번호 확인">
+
+    <button onclick="doSignup()" id="signup-btn" class="btn-submit">가입하기</button>
+
+    <div class="link-group">
+        <a href="/signin.html">취소하고 돌아가기</a>
+    </div>
+</div>
+
+<script>
+    // 이미 로그인된 경우 메인으로 이동
+    if (localStorage.getItem('accessToken')) {
+        location.href = "/";
+    }
+
+    async function doSignup() {
+        const email = document.getElementById('email').value;
+        const name = document.getElementById('name').value;
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirm').value;
+        const btn = document.getElementById('signup-btn');
+
+        // 기본 유효성 검사
+        if (!email || !name || !password) return alert("모든 항목을 입력해주세요.");
+        if (password !== confirm) return alert("비밀번호가 일치하지 않습니다.");
+
+        try {
+            btn.disabled = true;
+            btn.innerText = "가입 중...";
+
+            // 🚀 백엔드 v1 경로 반영
+            const response = await fetch('/api/v1/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, password })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 가입 성공 시 처리
+                alert("회원가입에 성공했습니다! 로그인 페이지로 이동합니다.");
+                location.href = "/signin.html";
+            } else {
+                // 백엔드 에러 규격 { success, error: { code, message } } 처리
+                const errorMsg = result.error ? result.error.message : (result.message || "가입 실패");
+                const errorCode = result.error ? result.error.code : (result.code || "");
+
+                if (errorCode === 'AUTH_EMAIL_ALREADY_EXISTS') {
+                    alert("이미 사용 중인 이메일입니다.");
+                } else {
+                    alert("가입 실패: " + errorMsg);
+                }
+            }
+        } catch (error) {
+            console.error("Error details:", error);
+            alert("서버와 통신할 수 없습니다. 서버가 실행 중인지 확인하세요.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "가입하기";
+        }
+    }
+
+    // 엔터키 입력 시 가입 진행
+    document.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') doSignup();
+    });
+</script>
+</body>
+</html>

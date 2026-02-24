@@ -1,10 +1,10 @@
 package com.example.backend.controller;
 
+import com.example.backend.audit.AuditLog;
+import com.example.backend.audit.AuditLogService;
 import com.example.backend.domain.receipt.ReceiptStatus;
 import com.example.backend.dto.ReceiptSummaryDto;
-import com.example.backend.entity.AuditLog;
 import com.example.backend.entity.Receipt;
-import com.example.backend.service.AuditLogService;
 import com.example.backend.service.ReceiptService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,12 +42,9 @@ public class ReceiptController {
       @RequestParam Long userId,
       @RequestParam(defaultValue = "false") boolean isAdmin) {
     try {
-
       List<ReceiptSummaryDto> dtos =
           receiptService.getWorkspaceReceipts(workspaceId, userId, isAdmin);
-
       byte[] out = receiptService.generateCsvFromDto(dtos);
-
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
           .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt_list.csv")
@@ -69,7 +66,7 @@ public class ReceiptController {
 
     String key =
         (idempotencyKey == null || idempotencyKey.isBlank())
-            ? "auto-" + UUID.randomUUID().toString()
+            ? "auto-" + UUID.randomUUID()
             : idempotencyKey;
 
     try {
@@ -89,7 +86,6 @@ public class ReceiptController {
       @RequestParam(defaultValue = "false") boolean isAdmin,
       @RequestParam ReceiptStatus status,
       @RequestParam(required = false, defaultValue = "관리자 요청") String reason) {
-
     return ResponseEntity.ok(
         receiptService.updateStatus(id, workspaceId, userId, status, reason, isAdmin));
   }
@@ -120,7 +116,6 @@ public class ReceiptController {
     Object tradeAtObj = payload.get("tradeAt");
     if (tradeAtObj != null && !String.valueOf(tradeAtObj).isBlank()) {
       try {
-
         tradeAt =
             LocalDateTime.parse(
                 String.valueOf(tradeAtObj),
@@ -143,9 +138,7 @@ public class ReceiptController {
       @RequestPart("files") List<MultipartFile> files,
       @RequestParam("workspaceId") Long workspaceId,
       @RequestParam("userId") Long userId) {
-
     if (files == null || files.isEmpty()) return ResponseEntity.badRequest().build();
-
     List<Receipt> results = receiptService.uploadMultiple(files, workspaceId, userId);
     return ResponseEntity.ok(results);
   }
@@ -153,7 +146,7 @@ public class ReceiptController {
   @GetMapping("/{id}/history")
   public ResponseEntity<List<AuditLog>> getHistory(@PathVariable Long id) {
     try {
-      List<AuditLog> logs = auditLogService.getHistory(id);
+      List<AuditLog> logs = auditLogService.findAllByReceiptId(id);
       return ResponseEntity.ok(logs);
     } catch (Exception e) {
       log.error("이력 조회 실패 - receiptId: {}", id, e);
@@ -169,7 +162,6 @@ public class ReceiptController {
   @PostMapping("/{id}/resubmit")
   public ResponseEntity<Receipt> resubmit(
       @PathVariable Long id, @RequestParam Long workspaceId, @RequestParam Long userId) {
-
     log.info("영수증 재제출 요청 - receiptId: {}, userId: {}", id, userId);
     return ResponseEntity.ok(receiptService.resubmitReceipt(id, workspaceId, userId));
   }

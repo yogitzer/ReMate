@@ -1,5 +1,7 @@
 package com.example.backend.service;
 
+import com.example.backend.audit.AuditAction;
+import com.example.backend.audit.AuditLogService;
 import com.example.backend.domain.receipt.ReceiptStatus;
 import com.example.backend.domain.receipt.SystemErrorCode;
 import com.example.backend.dto.ReceiptSummaryDto;
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -63,7 +66,6 @@ public class ReceiptService {
                             Receipt receipt = null;
                             try {
                               savedFileName = saveFileToLocal(file);
-
                               receipt =
                                   receiptRepository.save(
                                       Receipt.builder()
@@ -78,16 +80,12 @@ public class ReceiptService {
                                   "=== [검증 1] DB 선저장 완료: ID={}, Status={}",
                                   receipt.getId(),
                                   receipt.getStatus());
-
                               JsonNode ocrJson = googleOcrClient.recognize(fileBytes);
                               log.info("=== [검증 2] OCR 분석 시작 (ID: {})", receipt.getId());
                               return processOcrResult(receipt, ocrJson);
-
                             } catch (Exception e) {
                               log.error("OCR 분석 에러", e);
-                              if (receipt != null) {
-                                return markAsFailed(receipt, e);
-                              }
+                              if (receipt != null) return markAsFailed(receipt, e);
                               return saveFailedReceipt(
                                   idempotencyKey, fileHash, workspaceId, userId, savedFileName, e);
                             }
@@ -139,7 +137,6 @@ public class ReceiptService {
     if (e instanceof IOException) errorCode = SystemErrorCode.OCR_CONNECTION_FAILURE;
     else if (e.getMessage() != null && e.getMessage().contains("parse"))
       errorCode = SystemErrorCode.AI_PARSING_ERROR;
-
     receipt.markAsFailed(errorCode);
     return receipt;
   }
@@ -149,7 +146,6 @@ public class ReceiptService {
         receiptRepository
             .findByIdAndWorkspaceId(id, workspaceId)
             .orElseThrow(() -> new RuntimeException("RECEIPT_NOT_FOUND"));
-
     if (!isAdmin && !receipt.getUserId().equals(userId)) {
       throw new RuntimeException("ACCESS_DENIED");
     }
@@ -166,9 +162,25 @@ public class ReceiptService {
       boolean isAdmin) {
     Receipt receipt = getReceiptSecurely(id, workspaceId, userId, isAdmin);
     ReceiptStatus oldStatus = receipt.getStatus();
-
     receipt.updateStatus(status, reason, userId);
-    auditLogService.logStatusChange(id, userId, oldStatus, status, reason);
+
+    AuditAction action =
+        (status == ReceiptStatus.APPROVED)
+            ? AuditAction.APPROVE
+            : (status == ReceiptStatus.REJECTED) ? AuditAction.REJECT : AuditAction.ANALYZE;
+    auditLogService.record(
+        action,
+        "MEMBER",
+        String.valueOf(userId),
+        null,
+        id,
+        Map.of(
+            "oldStatus",
+            oldStatus.name(),
+            "newStatus",
+            status.name(),
+            "reason",
+            reason != null ? reason : ""));
 
     return receipt;
   }
@@ -182,33 +194,36 @@ public class ReceiptService {
       String storeName,
       LocalDateTime tradeAt,
       boolean isAdmin) {
-
     Receipt receipt = getReceiptSecurely(id, workspaceId, userId, isAdmin);
     ReceiptStatus oldStatus = receipt.getStatus();
-
     receipt.updateInfo(totalAmount, storeName, tradeAt);
-
     List<String> updatedTags = tagService.deriveTags(receipt);
     receipt.updateTags(updatedTags);
 
     if (oldStatus != receipt.getStatus()) {
-      auditLogService.logStatusChange(id, userId, oldStatus, receipt.getStatus(), "정보 수정 및 승인 처리");
+      auditLogService.record(
+          AuditAction.ANALYZE,
+          "MEMBER",
+          String.valueOf(userId),
+          null,
+          id,
+          Map.of("oldStatus", oldStatus.name(), "newStatus", receipt.getStatus().name()));
     }
-
     return receipt;
   }
 
   @Transactional
   public Receipt resubmitReceipt(Long id, Long workspaceId, Long userId) {
-
     Receipt receipt = getReceiptSecurely(id, workspaceId, userId, false);
-
     ReceiptStatus oldStatus = receipt.getStatus();
-
     receipt.resubmit();
-
-    auditLogService.logStatusChange(id, userId, oldStatus, receipt.getStatus(), "사용자 재제출");
-
+    auditLogService.record(
+        AuditAction.RESUBMIT,
+        "MEMBER",
+        String.valueOf(userId),
+        null,
+        id,
+        Map.of("oldStatus", oldStatus.name(), "newStatus", receipt.getStatus().name()));
     return receipt;
   }
 
@@ -216,13 +231,11 @@ public class ReceiptService {
   public List<ReceiptSummaryDto> getWorkspaceReceipts(
       Long workspaceId, Long currentUserId, boolean isAdmin) {
     List<Receipt> receipts = receiptRepository.findAllByWorkspaceId(workspaceId);
-
     return receipts.stream()
         .map(
             r -> {
               String ownerName =
                   userRepository.findById(r.getUserId()).map(u -> u.getName()).orElse("알 수 없음");
-
               if (isAdmin || r.getUserId().equals(currentUserId)) {
                 return new ReceiptSummaryDto(
                     r.getId(),
@@ -233,7 +246,6 @@ public class ReceiptService {
                     ownerName,
                     r.getTags());
               }
-
               return new ReceiptSummaryDto(
                   r.getId(), r.getStoreName(), 0, r.getTradeAt(), r.getStatus(), ownerName, null);
             })
@@ -263,7 +275,6 @@ public class ReceiptService {
         || !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
       throw new RuntimeException("FILE_TYPE_NOT_ALLOWED");
     }
-
     try {
       byte[] header = new byte[8];
       if (file.getInputStream().read(header) < 4) throw new RuntimeException("FILE_TOO_SMALL");
@@ -308,7 +319,6 @@ public class ReceiptService {
         .map(
             file -> {
               try {
-
                 return uploadAndProcess("multi-" + UUID.randomUUID(), file, workspaceId, userId);
               } catch (Exception e) {
                 return null;
@@ -324,7 +334,6 @@ public class ReceiptService {
     if (e instanceof IOException) errorCode = SystemErrorCode.OCR_CONNECTION_FAILURE;
     else if (e.getMessage() != null && e.getMessage().contains("parse"))
       errorCode = SystemErrorCode.AI_PARSING_ERROR;
-
     return receiptRepository.save(
         Receipt.builder()
             .idempotencyKey(key)
