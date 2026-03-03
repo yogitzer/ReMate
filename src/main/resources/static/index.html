@@ -3,62 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReMate | 메인</title>
+    <title>ReMate | 시작하기</title>
     <style>
-        :root { --kakao-color: #FEE500; --google-color: #4285F4; --primary-bg: #f4f7f6; --main-color: #1e293b; }
-        body { font-family: 'Pretendard', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: var(--primary-bg); }
-        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 90%; }
-        .btn { display: block; padding: 14px; margin: 10px 0; border-radius: 12px; text-decoration: none; font-weight: bold; transition: 0.2s; border: none; cursor: pointer; width: 100%; font-size: 1rem; text-align: center; }
-        .btn-google { background: var(--google-color); color: white; }
-        .btn-kakao { background: var(--kakao-color); color: #3c1e1e; }
-        .btn-main { background: #1e293b; color: white; }
-        .btn-admin { background: #ef4444; color: white; }
-        .btn-sub { background: #64748b; color: white; }
-        .btn-signup { border: 1px solid var(--main-color); color: var(--main-color); background: white; }
+        :root { --google: #4285F4; --kakao: #FEE500; --dark: #1e293b; --bg: #f8fafc; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 48px 40px; border-radius: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); text-align: center; width: 100%; max-width: 400px; }
+        .logo { font-size: 2rem; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .subtitle { color: #64748b; font-weight: 600; margin-bottom: 32px; font-size: 0.95rem; }
+        .btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 14px; text-decoration: none; font-weight: bold; font-size: 1rem; border: none; cursor: pointer; transition: 0.2s; box-sizing: border-box; text-align: center; }
+        .btn-google { background: var(--google); color: white; }
+        .btn-kakao { background: var(--kakao); color: #3c1e1e; }
+        .btn-email { background: var(--dark); color: white; margin-top: 12px; }
+        .btn-signup { background: white; color: var(--dark); border: 1.5px solid #e2e8f0; margin-top: 8px; }
+        .btn-signup:hover { background: #f1f5f9; }
+        .divider { margin: 24px 0; display: flex; align-items: center; color: #cbd5e1; font-size: 0.85rem; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #e2e8f0; margin: 0 16px; }
         .hidden { display: none; }
-        #user-info { margin-bottom: 25px; }
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; margin-top: 8px; font-weight: bold; }
-        .badge-admin { background: #fee2e2; color: #ef4444; }
-        .badge-member { background: #f1f5f9; color: #475569; }
-        .divider { margin: 20px 0; display: flex; align-items: center; color: #ccc; font-size: 0.8rem; }
-        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #eee; margin: 0 10px; }
-        #loading-section { color: #666; font-style: italic; }
+        .loading { font-size: 0.9rem; color: #94a3b8; margin-top: 20px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🧾 ReMate</h1>
-
-    <!-- 비로그인 상태 -->
-    <div id="intro-section">
-        <p><strong>영수증 관리의 시작</strong></p>
-        <p style="font-size: 0.85rem; color: #888; margin-bottom: 25px;">간편하게 시작하세요.</p>
+    <div class="logo">📄 ReMate</div>
+    <div id="auth-ui">
+        <p class="subtitle">영수증 관리의 시작</p>
         <a href="/oauth2/authorization/google" class="btn btn-google">Google로 시작하기</a>
         <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao로 시작하기</a>
         <div class="divider">또는</div>
-        <a href="/signin.html" class="btn btn-main">이메일로 로그인</a>
-        <a href="/signup.html" class="btn btn-signup">새로 가입하기</a>
+        <a href="/signin.html" class="btn btn-email">이메일로 로그인</a>
+        <a href="/signup.html" class="btn btn-signup">회원가입</a>
     </div>
-
-    <!-- 로그인 확인 중 -->
-    <div id="loading-section" class="hidden">
-        <p>🔍 워크스페이스 확인 중...</p>
-        <p style="font-size: 0.8rem; color: #999; margin-top: 10px;">잠시만 기다려 주세요.</p>
-    </div>
-
-    <!-- 로그인 후 -->
-    <div id="after-login" class="hidden">
-        <div id="user-info">
-            <p>👋 <strong id="user-nickname">사용자</strong>님</p>
-            <div id="role-badge" class="badge"></div>
-        </div>
-        <button id="main-nav-btn" class="btn btn-main">📸 영수증 관리</button>
-        <button id="admin-nav-btn" class="btn btn-admin hidden">⚖️ 멤버십 승인 대기</button>
-        <button onclick="location.href='/select-workspace.html'" class="btn btn-sub">⚙️ 워크스페이스 관리</button>
-        <a href="/" onclick="localStorage.clear()" style="display:block; margin-top:20px; color:#94a3b8; font-size:0.85rem; text-decoration: none;">로그아웃</a>
+    <div id="loading-ui" class="hidden">
+        <div class="loading">정보를 불러오는 중입니다...</div>
     </div>
 </div>
-
 <script>
     window.onload = () => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -67,65 +45,32 @@
             localStorage.setItem('accessToken', tokenFromUrl);
             window.history.replaceState({}, document.title, "/");
         }
-
         const token = localStorage.getItem('accessToken');
         if (token) {
-            document.getElementById('intro-section').classList.add('hidden');
-            document.getElementById('loading-section').classList.remove('hidden');
-            checkAuthStatus(token);
-        } else {
-            document.getElementById('intro-section').classList.remove('hidden');
+            document.getElementById('auth-ui').classList.add('hidden');
+            document.getElementById('loading-ui').classList.remove('hidden');
+            checkEntry(token);
         }
     };
-
-    async function checkAuthStatus(token) {
+    async function checkEntry(token) {
         try {
-            const res = await fetch('/api/v1/auth/status', {
+            const res = await fetch('/api/v1/workspaces/entry-check', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
-
-            if (data.authenticated) {
-                localStorage.setItem('accessToken', token);
-                localStorage.setItem('currentWorkspaceId', data.workspaceId || '');
-                localStorage.setItem('userRole', data.role || '');
-                localStorage.setItem('userName', data.userName || '');
-                localStorage.setItem('currentUserId', data.userId || '');
-
-                document.getElementById('loading-section').classList.add('hidden');
-                document.getElementById('after-login').classList.remove('hidden');
-                document.getElementById('user-nickname').innerText = data.userName;
-
-                const badgeEl = document.getElementById('role-badge');
-                if (data.role === 'ADMIN') {
-                    badgeEl.innerText = '관리자';
-                    badgeEl.className = 'badge badge-admin';
-                } else if (data.role === 'MEMBER') {
-                    badgeEl.innerText = '멤버';
-                    badgeEl.className = 'badge badge-member';
-                    document.getElementById('admin-nav-btn').classList.add('hidden');
-                }
-
-                const mainBtn = document.getElementById('main-nav-btn');
-                if (data.workspaceId) {
-                    mainBtn.onclick = () => location.href = '/upload.html';
+            const result = await res.json();
+            if (result.success) {
+                if (result.data.workspaceCount === 0) {
+                    location.href = '/select-workspace.html';
                 } else {
-                    mainBtn.onclick = () => {
-                        alert('참여 중인 워크스페이스가 없습니다. 설정 페이지로 이동합니다.');
-                        location.href = '/select-workspace.html';
-                    };
+                    location.href = '/workspace-list.html';
                 }
-            } else {
-                localStorage.clear();
-                document.getElementById('loading-section').classList.add('hidden');
-                document.getElementById('intro-section').classList.remove('hidden');
-            }
-        } catch (e) {
-            console.error("인증 확인 실패:", e);
-            localStorage.clear();
-            document.getElementById('loading-section').classList.add('hidden');
-            document.getElementById('intro-section').classList.remove('hidden');
-        }
+            } else { handleAuthError(); }
+        } catch (e) { handleAuthError(); }
+    }
+    function handleAuthError() {
+        localStorage.clear();
+        document.getElementById('auth-ui').classList.remove('hidden');
+        document.getElementById('loading-ui').classList.add('hidden');
     }
 </script>
 </body>
