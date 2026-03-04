@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ReMate | 내 워크스페이스</title>
+    <style>
+        :root { --bg: #f8fafc; --text: #1e293b; --primary: #1e40af; --accent: #3b82f6; --red: #ef4444; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); color: var(--text); padding: 40px; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 1000px; }
+        .header-area { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px; }
+        .btn-logout { padding: 8px 16px; background: white; color: var(--red); border: 1px solid var(--red); border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-logout:hover { background: var(--red); color: white; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; margin-bottom: 60px; }
+        .ws-card { background: white; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; cursor: pointer; transition: 0.2s; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; }
+        .ws-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .ws-card.add-card { border: 2px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; gap: 10px; color: #64748b; font-weight: 600; min-height: 160px; }
+        .invite-btn { margin-top: 12px; width: 100%; padding: 8px; background: #f1f5f9; border-radius: 8px; border: none; font-size: 0.8rem; font-weight: 600; color: var(--primary); cursor: pointer; }
+        .invitation-section { background: white; padding: 32px; border-radius: 24px; border: 1px solid #e2e8f0; margin-top: 40px; width: 100%; box-sizing: border-box; }
+        .invitation-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #f1f5f9; }
+        .btn-accept { background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; padding: 32px; border-radius: 20px; width: 100%; max-width: 400px; }
+        .modal input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; margin: 15px 0; box-sizing: border-box; }
+        .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-confirm { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-area">
+        <h1>내 워크스페이스</h1>
+        <button class="btn-logout" onclick="logout()">로그아웃</button>
+    </div>
+    <div class="grid" id="wsGrid">
+        <div class="ws-card add-card" onclick="openModal('create')">
+            <span>➕</span> 새로운 워크스페이스
+        </div>
+    </div>
+    <div class="invitation-section">
+        <h2>📩 초대받은 워크스페이스</h2>
+        <div id="invitationList"></div>
+    </div>
+</div>
+
+<div id="wsModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="modalTitle">새로운 워크스페이스</h2>
+        <input type="text" id="modalInput" placeholder="입력해 주세요">
+        <div class="modal-btns">
+            <button class="btn" onclick="closeModal()">취소</button>
+            <button class="btn btn-confirm" id="modalConfirmBtn">확인</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem('accessToken');
+    let selectedWsId = null;
+
+    window.onload = () => {
+        if (!token) { location.href = '/signin.html'; return; }
+        loadMyWorkspaces();
+        loadInvitations();
+    };
+
+    function logout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('currentWorkspaceId');
+        alert("로그아웃 되었습니다.");
+        location.href = '/signin.html';
+    }
+
+    function openModal(type, wsId = null) {
+        const modal = document.getElementById('wsModal');
+        document.getElementById('modalTitle').innerText = type === 'create' ? "새로운 워크스페이스" : "팀원 초대하기";
+        document.getElementById('modalInput').placeholder = type === 'create' ? "워크스페이스 이름 입력" : "초대할 이메일 입력";
+        selectedWsId = wsId;
+        document.getElementById('modalConfirmBtn').onclick = type === 'create' ? createWorkspace : sendInvitation;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('wsModal').style.display = 'none'; document.getElementById('modalInput').value = ''; }
+
+    async function loadMyWorkspaces() {
+        const res = await fetch('/api/v1/workspaces/my', { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await res.json();
+        const grid = document.getElementById('wsGrid');
+        grid.querySelectorAll('.ws-card:not(.add-card)').forEach(c => c.remove());
+        response.data.forEach(ws => {
+            const card = document.createElement('div');
+            card.className = 'ws-card';
+            card.innerHTML = `
+                    <div onclick="enterWorkspace(${ws.workspaceId})" style="flex-grow:1;">
+                        <div style="font-weight:700; font-size:1.1rem;">${ws.role === 'ADMIN' ? '👑' : '👤'} ${ws.workspaceName}</div>
+                        <div style="font-size:0.85rem; color:#94a3b8; margin-top:8px;">클릭하여 입장</div>
+                    </div>
+                    ${ws.role === 'ADMIN' ? `<button class="invite-btn" onclick="event.stopPropagation(); openModal('invite', ${ws.workspaceId})">이메일로 팀원 초대</button>` : ''}
+                `;
+            grid.insertBefore(card, grid.firstChild);
+        });
+    }
+
+    async function createWorkspace() {
+        const name = document.getElementById('modalInput').value;
+        const res = await fetch(`/api/v1/workspaces?name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        if((await res.json()).success) { closeModal(); loadMyWorkspaces(); }
+    }
+
+    async function sendInvitation() {
+        const email = document.getElementById('modalInput').value;
+        const res = await fetch(`/api/v1/workspaces/${selectedWsId}/invite?email=${encodeURIComponent(email)}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        if((await res.json()).success) { alert("초대 완료"); closeModal(); }
+    }
+
+    async function loadInvitations() {
+        const res = await fetch('/api/v1/workspaces/invitations', { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await res.json();
+        document.getElementById('invitationList').innerHTML = response.data.length === 0 ? '<p style="color:#94a3b8; text-align:center;">초대가 없습니다</p>' : response.data.map(inv => `
+                <div class="invitation-item"><span>${inv.workspaceName}</span><button class="btn-accept" onclick="acceptInv(${inv.membershipId})">수락</button></div>
+            `).join('');
+    }
+
+    async function acceptInv(id) {
+        const res = await fetch(`/api/v1/workspaces/invitations/${id}/accept`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        if ((await res.json()).success) { loadMyWorkspaces(); loadInvitations(); }
+    }
+
+    function enterWorkspace(id) { localStorage.setItem('currentWorkspaceId', id); location.href = '/upload.html'; }
+</script>
+</body>
+</html>

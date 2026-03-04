@@ -1,10 +1,14 @@
 package com.example.backend.config;
 
+import com.example.backend.global.error.ErrorCode;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,14 +26,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String authorization = request.getHeader("Authorization");
-    String token = jwtTokenProvider.resolveToken(authorization);
+    String authHeader = request.getHeader("Authorization");
+    String token = jwtTokenProvider.resolveToken(authHeader);
 
-    if (token != null && jwtTokenProvider.validateToken(token)) {
-      Authentication auth = jwtTokenProvider.getAuthentication(token);
-      SecurityContextHolder.getContext().setAuthentication(auth);
+    if (token != null) {
+      try {
+
+        if (jwtTokenProvider.validateToken(token)) {
+          Authentication auth = jwtTokenProvider.getAuthentication(token);
+          SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+      } catch (ExpiredJwtException e) {
+
+        sendErrorResponse(response, ErrorCode.UNAUTHORIZED, "토큰이 만료되었습니다. 다시 로그인해주세요.");
+        return;
+      } catch (Exception e) {
+
+        sendErrorResponse(response, ErrorCode.UNAUTHORIZED, "유효하지 않은 인증 토큰입니다.");
+        return;
+      }
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  /** 팀원의 ApiResponse 규격 + ErrorCode 상수를 활용한 에러 응답 */
+  private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode, String message)
+      throws IOException {
+    response.setStatus(errorCode.status().value());
+    response.setContentType("application/json;charset=UTF-8");
+
+    String json =
+        String.format(
+            "{\"success\": false, \"error\": {\"code\": \"%s\", \"message\": \"%s\"}, \"meta\": {\"timestamp\": \"%s\", \"traceId\": \"%s\"}}",
+            errorCode.name(), message, LocalDateTime.now(), UUID.randomUUID().toString());
+
+    response.getWriter().write(json);
   }
 }

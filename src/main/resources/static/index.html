@@ -3,51 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt Master | 메인</title>
+    <title>ReMate | 시작하기</title>
     <style>
-        :root { --kakao-color: #FEE500; --google-color: #4285F4; }
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
-        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-        .btn { display: block; padding: 12px; margin: 10px 0; border-radius: 8px; text-decoration: none; font-weight: bold; transition: 0.3s; }
-        .btn-google { background: var(--google-color); color: white; }
-        .btn-kakao { background: var(--kakao-color); color: #3c1e1e; }
-        .btn-upload { background: #333; color: white; border: none; cursor: pointer; width: 100%; }
+        :root { --google: #4285F4; --kakao: #FEE500; --dark: #1e293b; --bg: #f8fafc; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 48px 40px; border-radius: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); text-align: center; width: 100%; max-width: 400px; }
+        .logo { font-size: 2rem; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .subtitle { color: #64748b; font-weight: 600; margin-bottom: 32px; font-size: 0.95rem; }
+        .btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 14px; text-decoration: none; font-weight: bold; font-size: 1rem; border: none; cursor: pointer; transition: 0.2s; box-sizing: border-box; text-align: center; }
+        .btn-google { background: var(--google); color: white; }
+        .btn-kakao { background: var(--kakao); color: #3c1e1e; }
+        .btn-email { background: var(--dark); color: white; margin-top: 12px; }
+        .btn-signup { background: white; color: var(--dark); border: 1.5px solid #e2e8f0; margin-top: 8px; }
+        .btn-signup:hover { background: #f1f5f9; }
+        .divider { margin: 24px 0; display: flex; align-items: center; color: #cbd5e1; font-size: 0.85rem; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #e2e8f0; margin: 0 16px; }
         .hidden { display: none; }
-        #token-box { background: #eee; padding: 10px; font-size: 0.7rem; word-break: break-all; border-radius: 5px; margin-top: 15px; color: #666; }
+        .loading { font-size: 0.9rem; color: #94a3b8; margin-top: 20px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🧾 Receipt Master</h1>
-
-    <div id="before-login">
-        <p>소셜 계정으로 간편하게 시작하세요</p>
-        <a href="/oauth2/authorization/google" class="btn btn-google">Google 로그인</a>
-        <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao 로그인</a>
+    <div class="logo">📄 ReMate</div>
+    <div id="auth-ui">
+        <p class="subtitle">영수증 관리의 시작</p>
+        <a href="/oauth2/authorization/google" class="btn btn-google">Google로 시작하기</a>
+        <a href="/oauth2/authorization/kakao" class="btn btn-kakao">Kakao로 시작하기</a>
+        <div class="divider">또는</div>
+        <a href="/signin.html" class="btn btn-email">이메일로 로그인</a>
+        <a href="/signup.html" class="btn btn-signup">회원가입</a>
     </div>
-
-    <div id="after-login" class="hidden">
-        <p>🎉 <strong>기원님</strong>, 분석 준비가 완료되었습니다!</p>
-        <button onclick="location.href='/upload.html'" class="btn btn-upload">📸 영수증 관리 및 업로드</button>
-        <div id="token-box"></div>
-        <a href="/" onclick="localStorage.clear()" style="display:block; margin-top:15px; color:#999; font-size:0.8rem;">로그아웃</a>
+    <div id="loading-ui" class="hidden">
+        <div class="loading">정보를 불러오는 중입니다...</div>
     </div>
 </div>
-
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-
-    if (token) {
-        localStorage.setItem('accessToken', token);
-        document.getElementById('before-login').classList.add('hidden');
-        document.getElementById('after-login').classList.remove('hidden');
-        document.getElementById('token-box').innerText = "내 토큰: " + token;
-        window.history.replaceState({}, document.title, "/");
-    } else if (localStorage.getItem('accessToken')) {
-        document.getElementById('before-login').classList.add('hidden');
-        document.getElementById('after-login').classList.remove('hidden');
-        document.getElementById('token-box').innerText = "로그인 세션 유지 중";
+    window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        if (tokenFromUrl) {
+            localStorage.setItem('accessToken', tokenFromUrl);
+            window.history.replaceState({}, document.title, "/");
+        }
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+            document.getElementById('auth-ui').classList.add('hidden');
+            document.getElementById('loading-ui').classList.remove('hidden');
+            checkEntry(token);
+        }
+    };
+    async function checkEntry(token) {
+        try {
+            const res = await fetch('/api/v1/workspaces/entry-check', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+            if (result.success) {
+                if (result.data.workspaceCount === 0) {
+                    location.href = '/select-workspace.html';
+                } else {
+                    location.href = '/workspace-list.html';
+                }
+            } else { handleAuthError(); }
+        } catch (e) { handleAuthError(); }
+    }
+    function handleAuthError() {
+        localStorage.clear();
+        document.getElementById('auth-ui').classList.remove('hidden');
+        document.getElementById('loading-ui').classList.add('hidden');
     }
 </script>
 </body>
