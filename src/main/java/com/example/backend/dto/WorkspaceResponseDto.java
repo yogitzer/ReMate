@@ -7,8 +7,8 @@ import lombok.Getter;
 @Getter
 @Builder
 public class WorkspaceResponseDto {
-    private Long workspaceId;
-    private String workspaceName;
-    private WorkspaceRole role;
-    private Long membershipId;
+  private Long workspaceId;
+  private String workspaceName;
+  private WorkspaceRole role;
+  private Long membershipId;
 }

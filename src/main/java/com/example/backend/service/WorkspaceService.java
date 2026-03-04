@@ -33,20 +33,20 @@ public class WorkspaceService {
     Workspace workspace = workspaceRepository.save(Workspace.builder().name(name).build());
 
     workspaceMemberRepository.save(
-            WorkspaceMember.builder()
-                    .workspaceId(workspace.getId())
-                    .userId(user.getId())
-                    .role(WorkspaceRole.ADMIN)
-                    .status(MembershipStatus.ACCEPTED)
-                    .build());
+        WorkspaceMember.builder()
+            .workspaceId(workspace.getId())
+            .userId(user.getId())
+            .role(WorkspaceRole.ADMIN)
+            .status(MembershipStatus.ACCEPTED)
+            .build());
 
     auditLogService.record(
-            AuditAction.WORKSPACE_CREATE,
-            "USER",
-            user.getId().toString(),
-            workspace.getId(),
-            null,
-            Map.of("workspaceName", name));
+        AuditAction.WORKSPACE_CREATE,
+        "USER",
+        user.getId().toString(),
+        workspace.getId(),
+        null,
+        Map.of("workspaceName", name));
 
     return workspace.getId();
   }
@@ -54,49 +54,63 @@ public class WorkspaceService {
   @Transactional(readOnly = true)
   public List<WorkspaceResponseDto> getPendingInvitations(String principal) {
     User user = findUserByPrincipal(principal);
-    List<WorkspaceMember> members = workspaceMemberRepository.findAllByUserIdAndStatus(user.getId(), MembershipStatus.PENDING);
+    List<WorkspaceMember> members =
+        workspaceMemberRepository.findAllByUserIdAndStatus(user.getId(), MembershipStatus.PENDING);
 
-    return members.stream().map(m -> {
-      Workspace ws = workspaceRepository.findById(m.getWorkspaceId())
-              .orElseThrow(() -> new RuntimeException("WORKSPACE_NOT_FOUND"));
-      return WorkspaceResponseDto.builder()
-              .workspaceId(ws.getId())
-              .workspaceName(ws.getName())
-              .role(m.getRole())
-              .membershipId(m.getId())
-              .build();
-    }).collect(Collectors.toList());
+    return members.stream()
+        .map(
+            m -> {
+              Workspace ws =
+                  workspaceRepository
+                      .findById(m.getWorkspaceId())
+                      .orElseThrow(() -> new RuntimeException("WORKSPACE_NOT_FOUND"));
+              return WorkspaceResponseDto.builder()
+                  .workspaceId(ws.getId())
+                  .workspaceName(ws.getName())
+                  .role(m.getRole())
+                  .membershipId(m.getId())
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   @Transactional
   public void inviteByEmail(Long workspaceId, String email, String adminPrincipal) {
     validateAdmin(workspaceId, adminPrincipal);
-    User invitee = userRepository.findByEmail(email)
+    User invitee =
+        userRepository
+            .findByEmail(email)
             .orElseThrow(() -> new RuntimeException("INVITEE_NOT_FOUND"));
 
-    workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, invitee.getId())
-            .ifPresent(m -> { throw new RuntimeException("ALREADY_INVITED_OR_MEMBER"); });
+    workspaceMemberRepository
+        .findByWorkspaceIdAndUserId(workspaceId, invitee.getId())
+        .ifPresent(
+            m -> {
+              throw new RuntimeException("ALREADY_INVITED_OR_MEMBER");
+            });
 
     workspaceMemberRepository.save(
-            WorkspaceMember.builder()
-                    .workspaceId(workspaceId)
-                    .userId(invitee.getId())
-                    .role(WorkspaceRole.MEMBER)
-                    .status(MembershipStatus.PENDING)
-                    .build());
+        WorkspaceMember.builder()
+            .workspaceId(workspaceId)
+            .userId(invitee.getId())
+            .role(WorkspaceRole.MEMBER)
+            .status(MembershipStatus.PENDING)
+            .build());
 
     auditLogService.record(
-            AuditAction.MEMBER_JOIN_REQUEST,
-            "USER",
-            adminPrincipal,
-            workspaceId,
-            null,
-            Map.of("invitedEmail", email));
+        AuditAction.MEMBER_JOIN_REQUEST,
+        "USER",
+        adminPrincipal,
+        workspaceId,
+        null,
+        Map.of("invitedEmail", email));
   }
 
   @Transactional
   public void acceptInvitation(Long membershipId) {
-    WorkspaceMember member = workspaceMemberRepository.findById(membershipId)
+    WorkspaceMember member =
+        workspaceMemberRepository
+            .findById(membershipId)
             .orElseThrow(() -> new RuntimeException("INVITATION_NOT_FOUND"));
     member.updateStatus(MembershipStatus.ACCEPTED);
   }
@@ -104,23 +118,30 @@ public class WorkspaceService {
   @Transactional(readOnly = true)
   public List<WorkspaceResponseDto> getMyWorkspaces(String principal) {
     User user = findUserByPrincipal(principal);
-    List<WorkspaceMember> members = workspaceMemberRepository.findAllByUserIdAndStatus(user.getId(), MembershipStatus.ACCEPTED);
+    List<WorkspaceMember> members =
+        workspaceMemberRepository.findAllByUserIdAndStatus(user.getId(), MembershipStatus.ACCEPTED);
 
-    return members.stream().map(m -> {
-      Workspace ws = workspaceRepository.findById(m.getWorkspaceId())
-              .orElseThrow(() -> new RuntimeException("WORKSPACE_NOT_FOUND"));
-      return WorkspaceResponseDto.builder()
-              .workspaceId(ws.getId())
-              .workspaceName(ws.getName())
-              .role(m.getRole())
-              .membershipId(m.getId())
-              .build();
-    }).collect(Collectors.toList());
+    return members.stream()
+        .map(
+            m -> {
+              Workspace ws =
+                  workspaceRepository
+                      .findById(m.getWorkspaceId())
+                      .orElseThrow(() -> new RuntimeException("WORKSPACE_NOT_FOUND"));
+              return WorkspaceResponseDto.builder()
+                  .workspaceId(ws.getId())
+                  .workspaceName(ws.getName())
+                  .role(m.getRole())
+                  .membershipId(m.getId())
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   private void validateAdmin(Long workspaceId, String principal) {
     User user = findUserByPrincipal(principal);
-    WorkspaceMember requester = workspaceMemberRepository
+    WorkspaceMember requester =
+        workspaceMemberRepository
             .findByWorkspaceIdAndUserId(workspaceId, user.getId())
             .orElseThrow(() -> new RuntimeException("NOT_A_MEMBER"));
     if (requester.getRole() != WorkspaceRole.ADMIN) {
@@ -129,8 +150,11 @@ public class WorkspaceService {
   }
 
   private User findUserByPrincipal(String principal) {
-    return userRepository.findByEmail(principal)
-            .orElseGet(() -> userRepository.findAll().stream()
+    return userRepository
+        .findByEmail(principal)
+        .orElseGet(
+            () ->
+                userRepository.findAll().stream()
                     .filter(u -> principal.equals(u.getProviderId()))
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND")));
